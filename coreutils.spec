@@ -153,7 +153,7 @@ find tests -name '*.sh' -perm 0644 -print -exec chmod 0755 '{}' '+'
 autoreconf -fiv
 
 %build
-export CFLAGS="$RPM_OPT_FLAGS -fno-strict-aliasing -fpic"
+export CFLAGS="$RPM_OPT_FLAGS -fno-strict-aliasing -fpic -fanalyzer"
 
 # disable -flto on ppc64le to make test-float pass (#1789115)
 %ifarch ppc64le
