@@ -1,0 +1,136 @@
+From d70ddb3eb845c494280e7365e2b889242e7e1bb9 Mon Sep 17 00:00:00 2001
+From: rpm-build <rpm-build>
+Date: Mon, 4 Oct 2021 08:45:53 +0200
+Subject: [PATCH] coreutils-selinux.patch
+
+---
+ doc/coreutils.texi |  5 +++++
+ man/chcon.x        |  2 +-
+ man/runcon.x       |  2 +-
+ src/cp.c           | 16 +++++++++++++++-
+ src/install.c      | 10 ++++++++--
+ 5 files changed, 30 insertions(+), 5 deletions(-)
+
+diff --git a/doc/coreutils.texi b/doc/coreutils.texi
+index 6810c15..19b535c 100644
+--- a/doc/coreutils.texi
++++ b/doc/coreutils.texi
+@@ -8766,6 +8766,11 @@ done
+ exit $fail
+ @end example
+ 
++@item -c
++@cindex SELinux security context information, preserving
++Preserve SELinux security context of the original files if possible.
++Some file systems don't support storing of SELinux security context.
++
+ @item --copy-contents
+ @cindex directories, copying recursively
+ @cindex copying directories recursively
+diff --git a/man/chcon.x b/man/chcon.x
+index 8c1ff6f..c84fb96 100644
+--- a/man/chcon.x
++++ b/man/chcon.x
+@@ -1,4 +1,4 @@
+ [NAME]
+-chcon \- change file security context
++chcon \- change file SELinux security context
+ [DESCRIPTION]
+ .\" Add any additional description here
+diff --git a/man/runcon.x b/man/runcon.x
+index d2df13e..5c5f5d8 100644
+--- a/man/runcon.x
++++ b/man/runcon.x
+@@ -1,5 +1,5 @@
+ [NAME]
+-runcon \- run command with specified security context
++runcon \- run command with specified SELinux security context
+ [DESCRIPTION]
+ Run COMMAND with completely-specified CONTEXT, or with current or
+ transitioned security context modified by one or more of LEVEL,
+diff --git a/src/cp.c b/src/cp.c
+index c97a675..89fb8ec 100644
+--- a/src/cp.c
++++ b/src/cp.c
+@@ -191,6 +191,9 @@ Copy SOURCE to DEST, or multiple SOURCE(s) to DIRECTORY.\n\
+                                  additional attributes: context, links, xattr,\
+ \n\
+                                  all\n\
++"), stdout);
++      fputs (_("\
++  -c                           deprecated, same as --preserve=context\n\
+ "), stdout);
+       fputs (_("\
+       --no-preserve=ATTR_LIST  don't preserve the specified attributes\n\
+@@ -954,7 +957,7 @@ main (int argc, char **argv)
+   selinux_enabled = (0 < is_selinux_enabled ());
+   cp_option_init (&x);
+ 
+-  while ((c = getopt_long (argc, argv, "abdfHilLnprst:uvxPRS:TZ",
++  while ((c = getopt_long (argc, argv, "abcdfHilLnprst:uvxPRS:TZ",
+                            long_opts, NULL))
+          != -1)
+     {
+@@ -1002,6 +1005,17 @@ main (int argc, char **argv)
+           copy_contents = true;
+           break;
+ 
++        case 'c':
++          fprintf (stderr, "%s: warning: option '-c' is deprecated, please use '--preserve=context' instead\n", argv[0]);
++          if ( x.set_security_context ) {
++              (void) fprintf(stderr, "%s: cannot force target context and preserve it\n", argv[0]);
++             exit( 1 );
++           }
++           else if (selinux_enabled) {
++              x.preserve_security_context = true;
++              x.require_preserve_context = true;
++           }
++          break;
+         case 'd':
+           x.preserve_links = true;
+           x.dereference = DEREF_NEVER;
+diff --git a/src/install.c b/src/install.c
+index c9456fe..2b1bee9 100644
+--- a/src/install.c
++++ b/src/install.c
+@@ -638,7 +638,7 @@ In the 4th form, create all components of the given DIRECTORY(ies).\n\
+   -v, --verbose       print the name of each directory as it is created\n\
+ "), stdout);
+       fputs (_("\
+-      --preserve-context  preserve SELinux security context\n\
++  -P, --preserve-context  preserve SELinux security context (-P deprecated)\n\
+   -Z                      set SELinux security context of destination\n\
+                             file and each created directory to default type\n\
+       --context[=CTX]     like -Z, or if CTX is specified then set the\n\
+@@ -790,7 +790,7 @@ main (int argc, char **argv)
+   dir_arg = false;
+   umask (0);
+ 
+-  while ((optc = getopt_long (argc, argv, "bcCsDdg:m:o:pt:TvS:Z", long_options,
++  while ((optc = getopt_long (argc, argv, "bcCsDdg:m:o:pPt:TvS:Z", long_options,
+                               NULL)) != -1)
+     {
+       switch (optc)
+@@ -851,6 +851,8 @@ main (int argc, char **argv)
+           no_target_directory = true;
+           break;
+ 
++        case 'P':
++          fprintf (stderr, "%s: warning: option '-P' is deprecated, please use '--preserve-context' instead\n", argv[0]);
+         case PRESERVE_CONTEXT_OPTION:
+           if (! selinux_enabled)
+             {
+@@ -858,6 +860,10 @@ main (int argc, char **argv)
+                              "this kernel is not SELinux-enabled"));
+               break;
+             }
++          if ( x.set_security_context ) {
++             (void) fprintf(stderr, "%s: cannot force target context and preserve it\n", argv[0]);
++             exit( 1 );
++          }
+           x.preserve_security_context = true;
+           use_default_selinux_context = false;
+           break;
+-- 
+2.31.1
+
